@@ -8,7 +8,11 @@ import { CanvasComponent } from './canvas/canvas.component';
 import { Image } from './image';
 import { UploadImageComponent } from './upload-image/upload-image.component';
 import { ConfigService } from './config.service';
+import { browserComputePathBoundingBox } from './svg-bbox';
 
+export const kDefaultPath = `M 4 8 L 10 1 L 13 0 L 12 3 L 5 9 C 6 10 6 11 7 10 C 7 11 8 12 7 12 A 1.42 1.42 0 0 1 6 13 `
++ `A 5 5 0 0 0 4 10 Q 3.5 9.9 3.5 10.5 T 2 11.8 T 1.2 11 T 2.5 9.5 T 3 9 A 5 5 90 0 0 0 7 A 1.42 1.42 0 0 1 1 6 `
++ `C 1 5 2 6 3 6 C 2 7 3 7 4 8 M 10 1 L 10 3 L 12 3 L 10.2 2.8 L 10 1`;
 
 @Component({
   selector: 'app-root',
@@ -32,10 +36,7 @@ export class AppComponent implements AfterViewInit {
   controlPoints: SvgControlPoint[] = [];
 
   // Raw path:
-  _rawPath = this.storage.getPath()?.path
-    || `M 4 8 L 10 1 L 13 0 L 12 3 L 5 9 C 6 10 6 11 7 10 C 7 11 8 12 7 12 A 1.42 1.42 0 0 1 6 13 `
-      + `A 5 5 0 0 0 4 10 Q 3.5 9.9 3.5 10.5 T 2 11.8 T 1.2 11 T 2.5 9.5 T 3 9 A 5 5 90 0 0 0 7 A 1.42 1.42 0 0 1 1 6 `
-      + `C 1 5 2 6 3 6 C 2 7 3 7 4 8 M 10 1 L 10 3 L 12 3 L 10.2 2.8 L 10 1`;
+  _rawPath = this.storage.getPath()?.path || kDefaultPath;
   pathName: string = '';
   invalidSyntax = false;
 
@@ -85,7 +86,8 @@ export class AppComponent implements AfterViewInit {
     public cfg: ConfigService,
     private storage: StorageService
   ) {
-    for (const icon of ['delete', 'logo', 'more', 'github', 'zoom_in', 'zoom_out', 'zoom_fit']) {
+    (window as any).browserComputePathBoundingBox = browserComputePathBoundingBox;
+    for (const icon of ['delete', 'logo', 'more', 'github', 'zoom_in', 'zoom_out', 'zoom_fit', 'sponsor']) {
       matRegistry.addSvgIcon(icon, sanitizer.bypassSecurityTrustResourceUrl(`./assets/${icon}.svg`));
     }
     this.parsedPath = new Svg('');
@@ -104,10 +106,16 @@ export class AppComponent implements AfterViewInit {
       } else if (!$event.metaKey && !$event.ctrlKey && /^[mlvhcsqtaz]$/i.test($event.key)) {
         const isLower = $event.key === $event.key.toLowerCase();
         const key = $event.key.toUpperCase();
-        if (isLower && this.focusedItem && this.canInsertAfter(this.focusedItem, key)) {
-          this.insert(key, this.focusedItem, false);
-          $event.preventDefault();
+        if (isLower) {
+          // Item insertion
+          const lastItem = this.parsedPath.path.length ?  this.parsedPath.path[this.parsedPath.path.length - 1] : null;
+          const prevItem = this.focusedItem || lastItem;
+          if(this.canInsertAfter(prevItem, key)) {
+            this.insert(key, prevItem, false);
+            $event.preventDefault();
+          }
         } else if (!isLower && this.focusedItem && this.canConvert(this.focusedItem, key)) {
+          // Item convertion
           this.insert(key, this.focusedItem, true);
           $event.preventDefault();
         }
@@ -220,11 +228,13 @@ export class AppComponent implements AfterViewInit {
     this.strokeWidth = this.cfg.viewPortWidth / this.canvasWidth;
   }
 
-  insert(type: string, after: SvgItem, convert: boolean) {
+  insert(type: string, after: SvgItem | null, convert: boolean) {
     if (convert) {
-      this.focusedItem =
-        this.parsedPath.changeType(after, after.relative ? type.toLowerCase() : type);
-      this.afterModelChange();
+      if(after) {
+        this.focusedItem =
+          this.parsedPath.changeType(after, after.relative ? type.toLowerCase() : type);
+        this.afterModelChange();
+      }
     } else {
       this.draggedIsNew = true;
       const pts = this.targetPoints;
@@ -262,7 +272,7 @@ export class AppComponent implements AfterViewInit {
             newItem = SvgItem.Make([type]);
         }
         if(newItem) {
-          this.parsedPath.insert(newItem, after);
+          this.parsedPath.insert(newItem, after ?? undefined);
         }
       }
       this.setHistoryDisabled(true);
@@ -279,19 +289,11 @@ export class AppComponent implements AfterViewInit {
     if (this.cfg.viewPortLocked) {
       return;
     }
-    let xmin = 0;
-    let ymin = 0;
-    let xmax = 10;
-    let ymax = 10;
-    if (this.targetPoints.length > 0) {
-      xmin = Math.min(...this.targetPoints.map( it => it.x ));
-      ymin = Math.min(...this.targetPoints.map( it => it.y ));
-      xmax = Math.max(...this.targetPoints.map( it => it.x ));
-      ymax = Math.max(...this.targetPoints.map( it => it.y ));
-    }
+    const bbox = browserComputePathBoundingBox(this.rawPath);
+
     const k = this.canvasHeight / this.canvasWidth;
-    let w = xmax - xmin + 2;
-    let h = ymax - ymin + 2;
+    let w = bbox.width + 2;
+    let h = bbox.height + 2;
     if (k < h / w) {
       w = h / k;
     } else {
@@ -299,8 +301,8 @@ export class AppComponent implements AfterViewInit {
     }
 
     this.updateViewPort(
-      xmin - 1,
-      ymin - 1,
+      bbox.x - 1,
+      bbox.y - 1,
       w,
       h
     );

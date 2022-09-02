@@ -28,7 +28,7 @@
 
                     <button mat-mini-fab
                         color="basic"
-                        style="font-size: 1px; transform: none; margin:0 4px;"
+                        style="transform: none; margin:0 4px;"
                         matTooltip="Clear path"
                         matTooltipPosition="below"
                         matTooltipClass="app-tooltip"
@@ -39,7 +39,7 @@
 
                     <button mat-mini-fab
                         color="primary"
-                        style="font-size: 1px; transform: none; margin:0 4px 0 96px;"
+                        style="transform: none; margin:0 4px 0 94px;"
                         [matMenuTriggerFor]="appCreate"
                         [matMenuTriggerData]="{item:null, idx:-1}"
                         matTooltip="Append new command"
@@ -99,7 +99,7 @@
                     <button
                         mat-flat-button
                         (click)="cfg.viewPortLocked = !cfg.viewPortLocked"
-                        [matTooltip]="cfg.viewPortLocked ? 'Lock viewBox' : 'Unlock viewBox'"
+                        [matTooltip]="cfg.viewPortLocked ? 'Unlock viewBox' : 'Lock viewBox'"
                         matTooltipPosition="right"
                     >
                         <mat-icon *ngIf="!cfg.viewPortLocked">lock_open</mat-icon>
@@ -254,8 +254,7 @@
                     </ng-container>
 
                     <div style="flex:1"></div>
-                    <button mat-icon-button [matMenuTriggerFor]="appMenu" [matMenuTriggerData]="{item:item, idx:j}"
-                    >
+                    <button mat-icon-button [matMenuTriggerFor]="appMenu" [matMenuTriggerData]="{item:item, idx:j}" class="more-button">
                         <mat-icon svgIcon="more"></mat-icon>
                     </button>
                 </div>
@@ -343,7 +342,8 @@
                 <mat-icon>image</mat-icon>
             </button>
 
-            <app-export [path]="rawPath" [name]="pathName || '' "></app-export>
+            <app-export [path]="rawPath" [name]="pathName || '' " style="margin-right: 8px"></app-export>
+            <app-share [path]="rawPath"></app-share>
         </div>
         <div class="scene-bottom-actions">
             <button
@@ -425,9 +425,16 @@
 </div>
 
 
-<a *ngIf="isLeftPanelOpened"  class="footer" href="https://github.com/Yqnn/svg-path-editor" target="_blank">
-    <mat-icon svgIcon="github"></mat-icon> Bug reports &amp; feedback
-</a>
+<div *ngIf="isLeftPanelOpened"  class="footer">
+    <a href="https://github.com/Yqnn/svg-path-editor" target="_blank">
+        <mat-icon svgIcon="github"></mat-icon> GitHub
+    </a>
+    <a href="https://github.com/sponsors/Yqnn" target="_blank">
+        <mat-icon svgIcon="sponsor" class="sponsor"></mat-icon> Sponsor
+    </a>
+</div>
+
+<app-import (importPath)="openPath($event, '')"></app-import>
 
 <mat-menu #appMenu="matMenu"  xPosition="before">
     <ng-template matMenuContent let-item="item"  let-idx="idx">
