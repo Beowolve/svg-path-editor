@@ -29,6 +29,7 @@ export class UploadImageDialogComponent {
       reader.onload = (e: any) => {
         this.data = e.target.result;
         if(this.data) {
+          this.readImageSize({ref: this})
           this.displayableData = this.domSanitizer.bypassSecurityTrustResourceUrl(this.data);
         }
       };
@@ -38,6 +39,14 @@ export class UploadImageDialogComponent {
       alert('FileReader not supported');
     }
   }
+  readImageSize({ref}: { ref: any }): void {
+    let image = new Image();
+    image.src = ref.data;
+    image.onload = function() {
+      ref.width = image.width;
+      ref.height = image.height;
+    };
+  }  
   onCancel(): void {
     this.dialogRef.close();
   }
