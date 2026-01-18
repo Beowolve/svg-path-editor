@@ -3,7 +3,8 @@ name: Build and Deploy
 on:
   push:
     branches: ["master"]
-
+  workflow_dispatch:
+  
 permissions:
   contents: write
 
@@ -13,16 +14,18 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-
+        with:
+          fetch-depth: 0 # Fetches all history so it's definitely up to date
+          
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
           node-version: '22'
-          cache: 'npm'
+          # cache: 'npm'
 
       - name: Install and Build
         run: |
-          npm install
+          npm ci
           npm run build-prod
 
       - name: Deploy to GitHub Pages
@@ -30,3 +33,4 @@ jobs:
         with:
           folder: dist/svg-path-editor # This is where the script moved files from
           branch: gh-pages # The branch where the website lives
+          clean: true # Deletes old files in gh-pages before adding new ones
