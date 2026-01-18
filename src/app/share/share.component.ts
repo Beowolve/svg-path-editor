@@ -2,17 +2,11 @@ import { Component, Output, EventEmitter, Inject, Input, ViewChild, AfterViewIni
 import { MatDialog, MatDialogRef, MAT_DIALOG_DATA } from '@angular/material/dialog';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { StorageService } from '../storage.service';
+import { CopiedSnackbarComponent } from '../copied-snackbar/copied-snackbar.component';
 
 export class DialogData {
   path?: string;
 }
-
-@Component({
-  selector: 'app-share-snackbar',
-  templateUrl: 'share-dialog-snackbar.component.html'
-})
-export class ShareDialogSnackbarComponent {}
-
 
 @Component({
   selector: 'app-share-dialog',
@@ -45,7 +39,7 @@ export class ShareDialogComponent implements AfterViewInit {
   copy(): void {
     this.selectText();
     navigator.clipboard.writeText(this.inputField?.nativeElement.value);
-    this.snackBar.openFromComponent(ShareDialogSnackbarComponent, {
+    this.snackBar.openFromComponent(CopiedSnackbarComponent, {
       horizontalPosition:'center',
       verticalPosition: 'top',
       duration: 2000
@@ -64,7 +58,7 @@ export class ShareDialogComponent implements AfterViewInit {
   templateUrl: './share.component.html'
 })
 export class ShareComponent {
-  @Input() path: string = '';
+  @Input() path = '';
   @Output() importPath = new EventEmitter<string>();
 
   constructor(
@@ -74,7 +68,7 @@ export class ShareComponent {
   }
 
   openDialog(): void {
-    const dialogRef = this.dialog.open(ShareDialogComponent, {
+    this.dialog.open(ShareDialogComponent, {
       width: '800px',
       panelClass: 'dialog',
       autoFocus: false,

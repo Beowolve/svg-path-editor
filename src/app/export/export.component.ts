@@ -2,8 +2,10 @@ import { Component, Inject, Input } from '@angular/core';
 import { MatDialog, MatDialogRef, MAT_DIALOG_DATA} from '@angular/material/dialog';
 import { ExportConfigService } from '../config.service';
 import { StorageService } from '../storage.service';
-import { Svg } from '../svg';
+import { SvgPath } from '../../lib/svg';
 import { browserComputePathBoundingBox } from '../svg-bbox';
+import { MatSnackBar } from '@angular/material/snack-bar';
+import { CopiedSnackbarComponent } from '../copied-snackbar/copied-snackbar.component';
 
 interface DialogData {
   path: string;
@@ -25,7 +27,8 @@ export class ExportDialogComponent {
     public dialogRef: MatDialogRef<ExportDialogComponent>,
     public storageService: StorageService,
     @Inject(MAT_DIALOG_DATA) public data: DialogData,
-    public cfg: ExportConfigService
+    public cfg: ExportConfigService,
+    private snackBar: MatSnackBar
   ) {
     this.refreshViewbox();
   }
@@ -41,21 +44,38 @@ export class ExportDialogComponent {
     document.body.removeChild(anchor);
     setTimeout(() => window.URL.revokeObjectURL(anchor.href), 100);
   }
+	
+	copyToClipboard(data: string) {
+    navigator.clipboard.writeText(data);
+    this.snackBar.openFromComponent(CopiedSnackbarComponent, {
+      horizontalPosition:'center',
+      verticalPosition: 'top',
+      duration: 2000
+    });
+	}
+
+	makeSVG(): string {
+		return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${this.x} ${this.y} ${this.width} ${this.height}">
+	<path d="${this.data.path}"${this.cfg.stroke ? ` stroke="${this.cfg.strokeColor}" stroke-width="${this.cfg.strokeWidth}"` : ''} fill="${this.cfg.fill ? this.cfg.fillColor : 'none'}"/>
+</svg>`;
+	}
 
   onCancel(): void {
     this.dialogRef.close();
   }
   onExport(): void {
-    const svg =
-`<svg xmlns="http://www.w3.org/2000/svg" viewBox="${this.x} ${this.y} ${this.width} ${this.height}">
-  <path d="${this.data.path}"${this.cfg.stroke ? ` stroke="${this.cfg.strokeColor}" stroke-width="${this.cfg.strokeWidth}"` : ''} fill="${this.cfg.fill ? this.cfg.fillColor : 'none'}"/>
-</svg>`;
-    this.download(this.data.name || 'svg-path.svg', svg);
+    const svg = this.makeSVG();
+
+    this.download(this.data.name || 'svg-path.svg', svg);
     this.dialogRef.close();
   }
+	onCopyToClipboard(): void {
+		const svg = this.makeSVG();
+		this.copyToClipboard(svg);
+	}
 
   refreshViewbox() {
-    const p = new Svg(this.data.path);
+    const p = new SvgPath(this.data.path);
     const locs = p.targetLocations();
     if (locs.length > 0) {
       const bbox = browserComputePathBoundingBox(this.data.path);
@@ -85,18 +105,19 @@ export class ExportDialogComponent {
   templateUrl: './export.component.html'
 })
 export class ExportComponent {
-  @Input() path: string = '';
-  @Input() name: string = '';
+  @Input() path = '';
+  @Input() name = '';
 
   constructor(
     public dialog: MatDialog
   ) {}
 
   openDialog(): void {
-    const dialogRef = this.dialog.open(ExportDialogComponent, {
+    this.dialog.open(ExportDialogComponent, {
       width: '800px',
       panelClass: 'dialog',
-      data: {path: this.path, name: this.name}
+      data: {path: this.path, name: this.name},
+      autoFocus: false
     });
   }
 }

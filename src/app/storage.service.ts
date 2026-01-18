@@ -1,7 +1,8 @@
 import { Injectable } from '@angular/core';
+import { STORAGE } from './constants/storage.const';
 
 export class StoredPath {
-  name: string | null = '';
+  name: string | null = '';
   path = '';
   creationDate: Date = new Date();
   changeDate: Date = new Date();
@@ -20,7 +21,7 @@ export class StorageService {
     return this.getPath(name) !== undefined;
   }
 
-  getPath(name: string | null = null): StoredPath | undefined {
+  getPath(name: string | null = null): StoredPath | undefined {
     return this.storedPaths.find(it => it.name === name);
   }
 
@@ -47,18 +48,19 @@ export class StorageService {
 
   load() {
     this.storedPaths = [];
-    const stored = localStorage.getItem('storedPaths');
+    const stored = localStorage.getItem(STORAGE.STORED_PATHS);
     if (stored) {
-      const parsed = JSON.parse(stored) as any[];
-      parsed.forEach(it => {
-        it.creationDate = new Date(it.creationDate);
-        it.changeDate = new Date(it.changeDate);
-      });
-      this.storedPaths = parsed;
+      const parsed = JSON.parse(stored) as {creationDate: string, changeDate: string, name: string, path: string}[];
+      this.storedPaths = parsed.map(it => ({
+        creationDate: new Date(it.creationDate),
+        changeDate: new Date(it.changeDate),
+        name: it.name,
+        path: it.path
+      }));
     }
   }
 
   save() {
-    localStorage.setItem('storedPaths', JSON.stringify(this.storedPaths));
+    localStorage.setItem(STORAGE.STORED_PATHS, JSON.stringify(this.storedPaths));
   }
 }

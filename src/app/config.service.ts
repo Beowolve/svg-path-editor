@@ -1,16 +1,16 @@
 import { Injectable } from '@angular/core';
-
-
+import { getConfigKey } from './constants/storage.const';
 
 function save() {
-  return function(target: Object, propertyKey: string) { 
-    const localStorageKey = `SaveDecorator.${target.constructor.name}.${propertyKey}`;
+  // eslint-disable-next-line @typescript-eslint/ban-types
+  return function(target: Object, propertyKey: string) {
+    const localStorageKey = getConfigKey(target.constructor.name, propertyKey);
     const storedValue = localStorage.getItem(localStorageKey);
-    let value: any = JSON.parse(storedValue ?? 'null');
+    let value = JSON.parse(storedValue ?? 'null');
     const wasStored = storedValue !== null;
     let isInitialized = false;
 
-    const setter = (newVal: any) => {
+    const setter = (newVal: unknown) => {
       if(!wasStored || isInitialized) {
         value = newVal;
         if(isInitialized) {

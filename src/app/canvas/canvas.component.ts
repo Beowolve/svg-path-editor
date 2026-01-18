@@ -1,8 +1,8 @@
-import { AfterViewInit, Component, ElementRef, EventEmitter, HostListener, Input, OnChanges, OnInit, Output, SimpleChanges, ViewChild } from '@angular/core';
+import { AfterViewInit, Component, ElementRef, EventEmitter, HostListener, Input, OnChanges, OnInit, Output, SimpleChanges } from '@angular/core';
 import { Subject } from 'rxjs';
 import { buffer, map, throttleTime } from 'rxjs/operators';
 import { Image } from '../image';
-import { Point, Svg, SvgControlPoint, SvgItem, SvgPoint } from '../svg';
+import { Point, SvgPath, SvgControlPoint, SvgItem, SvgPoint } from '../../lib/svg';
 
 /* eslint-disable @angular-eslint/component-selector */
 @Component({
@@ -30,20 +30,20 @@ export class CanvasComponent implements OnInit, OnChanges, AfterViewInit {
   @Input() set focusedImage(focusedImage: Image | null) { this._focusedImage = focusedImage; this.focusedImageChange.emit(this.focusedImage); }
 
   constructor(public canvas: ElementRef) { }
-  @Input() parsedPath?: Svg;
+  @Input() parsedPath?: SvgPath;
   @Input() targetPoints: SvgPoint[] = [];
   @Input() controlPoints: SvgControlPoint[] = [];
 
   @Input() decimals?: number;
-  @Input() viewPortX: number = 0;
-  @Input() viewPortY: number = 0;
-  @Input() viewPortWidth: number = 0;
-  @Input() viewPortHeight: number = 0;
-  @Input() strokeWidth: number = 1;
-  @Input() preview: boolean = false;
-  @Input() filled: boolean = false;
-  @Input() showTicks: boolean = false;
-  @Input() tickInterval: number = 1;
+  @Input() viewPortX = 0;
+  @Input() viewPortY = 0;
+  @Input() viewPortWidth = 0;
+  @Input() viewPortHeight = 0;
+  @Input() strokeWidth = 1;
+  @Input() preview = false;
+  @Input() filled = false;
+  @Input() showTicks = false;
+  @Input() tickInterval = 1;
   @Input() draggedIsNew = false;
   @Input() images: Image[] = [];
   @Input() editImages = true;
@@ -51,14 +51,15 @@ export class CanvasComponent implements OnInit, OnChanges, AfterViewInit {
   @Output() afterModelChange = new EventEmitter<void>();
   @Output() dragging = new EventEmitter<boolean>();
   @Output() viewPort = new EventEmitter<{x: number, y: number, w: number, h: number | null, force?: boolean}>();
-
+  @Output() hoverPosition = new EventEmitter<{x: number, y: number} | undefined>();
+	@Output() cursorPosition = new EventEmitter<Point & {decimals?: number} | undefined>();
 
   @Output() emptyCanvas = new EventEmitter<void>();
 
-  _canvasWidth: number = 0;
+  _canvasWidth = 0;
   @Output() canvasWidthChange = new EventEmitter<number>();
 
-  _canvasHeight: number = 0;
+  _canvasHeight = 0;
   @Output() canvasHeightChange = new EventEmitter<number>();
 
   _draggedPoint: SvgPoint | null = null;
@@ -80,21 +81,21 @@ export class CanvasComponent implements OnInit, OnChanges, AfterViewInit {
   wheel$ = new Subject<WheelEvent>();
   dragWithoutClick = true;
   draggedImage: Image | null = null;
-  draggedImageType: number = 0;
+  draggedImageType = 0;
   xGrid: number[] = [];
   yGrid: number[] = [];
 
   // Utility functions
   min = Math.min;
   abs = Math.abs;
-  trackByIndex = (idx: number, _: any) => idx;
+  trackByIndex = (idx: number, _: unknown) => idx;
 
   ngOnChanges(changes: SimpleChanges): void {
-    if (changes.viewPortX || changes.viewPortY || changes.viewPortWidth || changes.viewPortHeight) {
+    if (changes['viewPortX'] || changes['viewPortY'] || changes['viewPortWidth'] || changes['viewPortHeight']) {
       this.refreshGrid();
     }
-    if (changes.draggedPoint && changes.draggedPoint.currentValue) {
-      this.startDrag(changes.draggedPoint.currentValue);
+    if (changes['draggedPoint'] && changes['draggedPoint'].currentValue) {
+      this.startDrag(changes['draggedPoint'].currentValue);
     }
   }
 
@@ -107,7 +108,7 @@ export class CanvasComponent implements OnInit, OnChanges, AfterViewInit {
     });
 
     // Following line is a workaround for a bug in Safari preventing the Wheel events to be fired:
-    window.addEventListener('wheel', () => {});
+    window.addEventListener('wheel', () => { /* */ });
   }
 
   ngOnInit(): void {
@@ -178,7 +179,7 @@ export class CanvasComponent implements OnInit, OnChanges, AfterViewInit {
     }
   }
 
-  eventToLocation(event: MouseEvent | TouchEvent, idx = 0): {x: number, y: number} {
+  eventToLocation(event: MouseEvent | TouchEvent, idx = 0): {x: number, y: number} {
     const rect = this.canvas.nativeElement.getBoundingClientRect();
     const touch = event instanceof MouseEvent ? event : event.touches[idx];
     const x = this.viewPortX + (touch.clientX - rect.left) * this.strokeWidth;
@@ -186,7 +187,7 @@ export class CanvasComponent implements OnInit, OnChanges, AfterViewInit {
     return {x, y};
   }
 
-  pinchToZoom(previousEvent: MouseEvent | TouchEvent, event: MouseEvent | TouchEvent) {
+  pinchToZoom(previousEvent: MouseEvent | TouchEvent, event: MouseEvent | TouchEvent) {
     if ( window.TouchEvent
       && previousEvent instanceof TouchEvent
       && event instanceof TouchEvent
@@ -233,6 +234,8 @@ export class CanvasComponent implements OnInit, OnChanges, AfterViewInit {
     }
 
     this.dragging.emit(true);
+    this.setCursorPosition({...item, decimals: this.decimals});
+
     if (item.itemReference.getType().toLowerCase() === 'z') {
       return;
     }
@@ -263,6 +266,7 @@ export class CanvasComponent implements OnInit, OnChanges, AfterViewInit {
     if (!this.draggedPoint && !this.wasCanvasDragged) {
       // unselect action
       this.focusedItem = null;
+      this.setCursorPosition(undefined);
     }
     if (!this.draggedImage && !this.wasCanvasDragged) {
       this.focusedImage = null;
@@ -276,7 +280,10 @@ export class CanvasComponent implements OnInit, OnChanges, AfterViewInit {
   }
 
   drag(event: MouseEvent | TouchEvent) {
-    if (this.draggedPoint || this.draggedEvt || this.draggedImage) {
+    const pt = this.eventToLocation(event);
+    this.hoverPosition.emit(pt);
+
+    if (this.draggedPoint || this.draggedEvt || this.draggedImage) {
 
       if (!this.dragWithoutClick && event instanceof MouseEvent && event.buttons === 0) {
         // Stop dragging if click is not maintained anymore.
@@ -285,7 +292,6 @@ export class CanvasComponent implements OnInit, OnChanges, AfterViewInit {
       }
 
       event.stopPropagation();
-      const pt = this.eventToLocation(event);
       if (this.draggedImage && this.draggedEvt) {
         const oriPt = this.eventToLocation(this.draggedEvt);
         /* eslint-disable no-bitwise */
@@ -317,8 +323,11 @@ export class CanvasComponent implements OnInit, OnChanges, AfterViewInit {
         }
         this.afterModelChange.emit();
         this.draggedEvt = null;
+        this.setCursorPosition({...pt, decimals});
       } else if(this.draggedEvt) {
         this.wasCanvasDragged = true;
+        this.hoverPosition.emit(undefined);
+
         const pinchToZoom = this.pinchToZoom(this.draggedEvt, event);
         if (pinchToZoom !== null){
           const w = pinchToZoom.zoom * this.viewPortWidth;
@@ -337,4 +346,8 @@ export class CanvasComponent implements OnInit, OnChanges, AfterViewInit {
       }
     }
   }
+
+	setCursorPosition(location?: {x: number, y: number, decimals?: number}) {
+		this.cursorPosition.emit(location);
+	}
 }
