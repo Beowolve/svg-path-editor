@@ -26,6 +26,7 @@ jobs:
       - name: Install and Build
         run: |
           npm ci
+          rm -rf dist/svg-path-editor # make sure dist path is empty before building
           npm run build-prod
 
       - name: Deploy to GitHub Pages
